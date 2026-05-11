@@ -111,13 +111,18 @@ def consensus(
     out_union: Path = typer.Option(..., "--out-union"),
     out_intersection: Path = typer.Option(..., "--out-intersection"),
     iou_threshold: float = typer.Option(0.3, "--iou-threshold"),
+    union_containment: float = typer.Option(
+        0.2,
+        "--union-containment",
+        help="Min intersection / larger-polygon area for union merging.",
+    ),
 ):
     """Build union + IoU-matched intersection consensus."""
     from .consensus import build_intersection, build_union, dedupe_overlapping
 
-    s = dedupe_overlapping(read_geoparquet(stardist))
-    c = dedupe_overlapping(read_geoparquet(cellpose))
-    u = build_union(s, c)
+    s = dedupe_overlapping(read_geoparquet(stardist), containment_threshold=union_containment)
+    c = dedupe_overlapping(read_geoparquet(cellpose), containment_threshold=union_containment)
+    u = build_union(s, c, containment_threshold=union_containment)
     i = build_intersection(s, c, iou_threshold=iou_threshold)
     write_geoparquet(u, out_union)
     write_geoparquet(i, out_intersection)
@@ -134,6 +139,11 @@ def run(
     edge_fraction: float = typer.Option(0.1, "--edge-fraction", help="Per-side inner keep-box inset, in tile-size units."),
     batch_size: int = typer.Option(8, "--batch-size"),
     iou_threshold: float = typer.Option(0.3, "--iou-threshold"),
+    union_containment: float = typer.Option(
+        0.2,
+        "--union-containment",
+        help="Min intersection / larger-polygon area for union merging.",
+    ),
     gpu: bool = typer.Option(True, "--gpu/--cpu"),
     mpp: Optional[float] = typer.Option(None, "--mpp", help="Override base-level MPP if slide metadata lacks it"),
     viz_html: bool = typer.Option(True, "--viz-html/--no-viz-html", help="Build interactive HTML viewer."),
@@ -190,11 +200,14 @@ def run(
         )
 
     with step(f"[5/{total_steps}] consensus"):
-        s_gdf = dedupe_overlapping(read_geoparquet(stardist_out))
-        c_gdf = dedupe_overlapping(read_geoparquet(cellpose_out))
+        s_gdf = dedupe_overlapping(read_geoparquet(stardist_out), containment_threshold=union_containment)
+        c_gdf = dedupe_overlapping(read_geoparquet(cellpose_out), containment_threshold=union_containment)
         write_geoparquet(s_gdf, stardist_out)
         write_geoparquet(c_gdf, cellpose_out)
-        write_geoparquet(build_union(s_gdf, c_gdf), out_dir / "consensus_union.parquet")
+        write_geoparquet(
+            build_union(s_gdf, c_gdf, containment_threshold=union_containment),
+            out_dir / "consensus_union.parquet",
+        )
         write_geoparquet(
             build_intersection(s_gdf, c_gdf, iou_threshold=iou_threshold),
             out_dir / "consensus_intersection.parquet",

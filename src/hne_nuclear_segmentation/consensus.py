@@ -8,8 +8,17 @@ from shapely.ops import unary_union
 from shapely.strtree import STRtree
 
 
-def _overlap_components(geoms: list) -> list[list[int]]:
-    """Union-find groups of geometries by pairwise intersection."""
+def _overlap_components(
+    geoms: list, containment_threshold: float = 0.2
+) -> list[list[int]]:
+    """Union-find groups of geometries by substantial pairwise overlap.
+
+    Two geometries are linked when their intersection area covers at least
+    ``containment_threshold`` of the larger polygon's area. This avoids
+    merging polygons that merely touch or graze each other at a border.
+    Set ``containment_threshold`` to 0 to recover the legacy "any
+    intersection" behavior.
+    """
     n = len(geoms)
     parent = list(range(n))
 
@@ -31,7 +40,16 @@ def _overlap_components(geoms: list) -> list[list[int]]:
                 j = int(j)
                 if j <= i:
                     continue
-                if g.intersects(geoms[j]):
+                h = geoms[j]
+                if not g.intersects(h):
+                    continue
+                inter = g.intersection(h).area
+                if inter <= 0:
+                    continue
+                larger = max(g.area, h.area)
+                if larger <= 0:
+                    continue
+                if inter / larger >= containment_threshold:
                     union(i, j)
 
     components: dict[int, list[int]] = {}
@@ -40,19 +58,23 @@ def _overlap_components(geoms: list) -> list[list[int]]:
     return list(components.values())
 
 
-def dedupe_overlapping(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+def dedupe_overlapping(
+    gdf: gpd.GeoDataFrame, containment_threshold: float = 0.2
+) -> gpd.GeoDataFrame:
     """Merge overlapping polygons within a single model's output by union.
 
     Tiles produced with overlap_fraction > 2*edge_fraction yield duplicate
     detections in their overlapping keep regions. Collapse each connected
     component of intersecting polygons into a single polygon (unary_union).
-    nucleus_id is reassigned; tile_id of the first member is kept for
-    traceability.
+    Only links polygons whose intersection covers at least
+    ``containment_threshold`` of the larger member's area, so bordering or
+    grazing detections are kept separate. nucleus_id is reassigned; tile_id
+    of the first member is kept for traceability.
     """
     if gdf.empty:
         return gdf.copy()
     geoms = list(gdf.geometry)
-    comps = _overlap_components(geoms)
+    comps = _overlap_components(geoms, containment_threshold=containment_threshold)
     rows = []
     for new_id, idxs in enumerate(comps):
         merged = unary_union([geoms[i] for i in idxs]) if len(idxs) > 1 else geoms[idxs[0]]
@@ -70,13 +92,20 @@ def dedupe_overlapping(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
 
 
 def build_union(
-    stardist_gdf: gpd.GeoDataFrame, cellpose_gdf: gpd.GeoDataFrame
+    stardist_gdf: gpd.GeoDataFrame,
+    cellpose_gdf: gpd.GeoDataFrame,
+    containment_threshold: float = 0.2,
 ) -> gpd.GeoDataFrame:
     """Merge overlapping polygons from both models into single polygons.
 
-    Each output row is a connected component (via overlap graph) of input polygons,
-    geometry = unary_union of that component, models = sorted list of contributing
-    model names.
+    Two polygons are merged into the same component only when their
+    intersection area covers at least ``containment_threshold`` of the
+    larger polygon's area. This prevents polygons that merely touch or
+    graze each other at a tile/cell border from being collapsed together;
+    such polygons stay as separate rows (and may slightly overlap in the
+    output, which is acceptable). Each output row is a connected component
+    of the resulting overlap graph; geometry = unary_union of that
+    component, models = sorted list of contributing model names.
     """
     a = stardist_gdf.assign(model_name="stardist")
     b = cellpose_gdf.assign(model_name="cellpose")
@@ -93,7 +122,9 @@ def build_union(
     names = list(combined["model_name"])
 
     rows = []
-    for cid, idxs in enumerate(_overlap_components(geoms)):
+    for cid, idxs in enumerate(
+        _overlap_components(geoms, containment_threshold=containment_threshold)
+    ):
         merged = unary_union([geoms[i] for i in idxs]) if len(idxs) > 1 else geoms[idxs[0]]
         models = sorted({names[i] for i in idxs})
         rows.append(

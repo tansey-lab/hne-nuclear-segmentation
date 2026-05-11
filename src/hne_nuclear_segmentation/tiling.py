@@ -18,24 +18,36 @@ def generate_tiles(
     tissue: gpd.GeoDataFrame,
     target_mpp: float,
     tile_size_model_px: int = 1024,
-    overlap_fraction: float = 0.10,
+    overlap_fraction: float = 0.5,
+    edge_fraction: float = 0.1,
 ) -> gpd.GeoDataFrame:
     """Generate tiles intersecting tissue.
 
     tile_size_model_px is the tile size *at the model's target MPP*.
     Tile bounds are returned in level-0 pixel coordinates.
+
+    overlap_fraction controls stride: step = tile_size * (1 - overlap_fraction).
+    edge_fraction controls the inner keep box: each side is inset by
+    tile_size * edge_fraction, and only nuclei whose centroid lies inside that
+    box are reported. With overlap_fraction > 2*edge_fraction adjacent keep
+    boxes overlap, so tissue near tile borders is always covered by some
+    tile's keep box — at the cost of duplicate detections, which downstream
+    dedupe-by-union resolves.
     """
-    if not (0.0 <= overlap_fraction < 0.5):
-        raise ValueError("overlap_fraction must be in [0, 0.5)")
+    if not (0.0 <= overlap_fraction < 1.0):
+        raise ValueError("overlap_fraction must be in [0, 1)")
+    if not (0.0 <= edge_fraction < 0.5):
+        raise ValueError("edge_fraction must be in [0, 0.5)")
 
     scale = target_mpp / slide.mpp  # base px per model px
     tile_size_base = int(round(tile_size_model_px * scale))
     step_base = max(1, int(round(tile_size_base * (1.0 - overlap_fraction))))
-    keep_margin_base = int(round(tile_size_base * overlap_fraction))
+    keep_margin_base = int(round(tile_size_base * edge_fraction))
 
     log.info(
-        "tiling slide %dx%d: tile_base=%d step=%d (target_mpp=%.3f, slide_mpp=%.4f)",
-        slide.width, slide.height, tile_size_base, step_base, target_mpp, slide.mpp,
+        "tiling slide %dx%d: tile_base=%d step=%d keep_margin=%d (target_mpp=%.3f, slide_mpp=%.4f)",
+        slide.width, slide.height, tile_size_base, step_base, keep_margin_base,
+        target_mpp, slide.mpp,
     )
     log.info("building tissue union from %d polygons", len(tissue))
     tissue_union = unary_union(list(tissue.geometry)) if len(tissue) else None

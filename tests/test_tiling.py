@@ -25,11 +25,32 @@ def test_tile_count_no_overlap():
 def test_keep_box_inner_region():
     s = _fake_slide(2048, 2048, mpp=0.5)
     tissue = gpd.GeoDataFrame(geometry=[box(0, 0, 2048, 2048)], crs=None)
-    tiles = generate_tiles(s, tissue, target_mpp=0.5, tile_size_model_px=1000, overlap_fraction=0.1)
+    tiles = generate_tiles(
+        s, tissue, target_mpp=0.5, tile_size_model_px=1000,
+        overlap_fraction=0.5, edge_fraction=0.1,
+    )
     row = tiles.iloc[0]
-    # keep box should be inset by 10% of tile size on each side
+    # keep box should be inset by edge_fraction (10%) of tile size on each side
     assert row["keep_x0"] - row["x0"] == 100
     assert row["x1"] - row["keep_x1"] == 100
+
+
+def test_overlap_independent_of_edge():
+    s = _fake_slide(2048, 2048, mpp=0.5)
+    tissue = gpd.GeoDataFrame(geometry=[box(0, 0, 2048, 2048)], crs=None)
+    tiles = generate_tiles(
+        s, tissue, target_mpp=0.5, tile_size_model_px=1000,
+        overlap_fraction=0.5, edge_fraction=0.1,
+    )
+    # stride should be tile_size * (1 - overlap) = 500
+    xs = sorted({int(r.x0) for r in tiles.itertuples()})
+    assert xs[1] - xs[0] == 500
+    # adjacent keep boxes should overlap (no missing strip)
+    rows = sorted(
+        (r for r in tiles.itertuples() if r.y0 == 0),
+        key=lambda r: r.x0,
+    )
+    assert rows[0].keep_x1 > rows[1].keep_x0
 
 
 def test_scale_factor_applied_when_target_mpp_differs():

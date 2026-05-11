@@ -4,7 +4,69 @@ from __future__ import annotations
 import geopandas as gpd
 import pandas as pd
 from shapely.geometry import Polygon
+from shapely.ops import unary_union
 from shapely.strtree import STRtree
+
+
+def _overlap_components(geoms: list) -> list[list[int]]:
+    """Union-find groups of geometries by pairwise intersection."""
+    n = len(geoms)
+    parent = list(range(n))
+
+    def find(i):
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    def union(i, j):
+        ri, rj = find(i), find(j)
+        if ri != rj:
+            parent[rj] = ri
+
+    if n:
+        tree = STRtree(geoms)
+        for i, g in enumerate(geoms):
+            for j in tree.query(g):
+                j = int(j)
+                if j <= i:
+                    continue
+                if g.intersects(geoms[j]):
+                    union(i, j)
+
+    components: dict[int, list[int]] = {}
+    for i in range(n):
+        components.setdefault(find(i), []).append(i)
+    return list(components.values())
+
+
+def dedupe_overlapping(gdf: gpd.GeoDataFrame) -> gpd.GeoDataFrame:
+    """Merge overlapping polygons within a single model's output by union.
+
+    Tiles produced with overlap_fraction > 2*edge_fraction yield duplicate
+    detections in their overlapping keep regions. Collapse each connected
+    component of intersecting polygons into a single polygon (unary_union).
+    nucleus_id is reassigned; tile_id of the first member is kept for
+    traceability.
+    """
+    if gdf.empty:
+        return gdf.copy()
+    geoms = list(gdf.geometry)
+    comps = _overlap_components(geoms)
+    rows = []
+    for new_id, idxs in enumerate(comps):
+        merged = unary_union([geoms[i] for i in idxs]) if len(idxs) > 1 else geoms[idxs[0]]
+        first = gdf.iloc[idxs[0]]
+        row = {
+            "nucleus_id": new_id,
+            "tile_id": int(first["tile_id"]) if "tile_id" in gdf.columns else -1,
+            "area_px": float(merged.area),
+            "geometry": merged,
+        }
+        if "model_name" in gdf.columns:
+            row["model_name"] = first["model_name"]
+        rows.append(row)
+    return gpd.GeoDataFrame(rows, geometry="geometry", crs=gdf.crs)
 
 
 def build_union(
@@ -29,39 +91,10 @@ def build_union(
 
     geoms = list(combined.geometry)
     names = list(combined["model_name"])
-    tree = STRtree(geoms)
-
-    n = len(geoms)
-    parent = list(range(n))
-
-    def find(i):
-        while parent[i] != i:
-            parent[i] = parent[parent[i]]
-            i = parent[i]
-        return i
-
-    def union(i, j):
-        ri, rj = find(i), find(j)
-        if ri != rj:
-            parent[rj] = ri
-
-    for i, g in enumerate(geoms):
-        for j in tree.query(g):
-            j = int(j)
-            if j <= i:
-                continue
-            if g.intersects(geoms[j]):
-                union(i, j)
-
-    components: dict[int, list[int]] = {}
-    for i in range(n):
-        components.setdefault(find(i), []).append(i)
 
     rows = []
-    from shapely.ops import unary_union
-
-    for cid, idxs in enumerate(components.values()):
-        merged = unary_union([geoms[i] for i in idxs])
+    for cid, idxs in enumerate(_overlap_components(geoms)):
+        merged = unary_union([geoms[i] for i in idxs]) if len(idxs) > 1 else geoms[idxs[0]]
         models = sorted({names[i] for i in idxs})
         rows.append(
             {

@@ -51,7 +51,8 @@ def tile(
     out: Path = typer.Option(..., "--out"),
     target_mpp: float = typer.Option(0.5, "--target-mpp"),
     tile_size: int = typer.Option(1024, "--tile-size"),
-    overlap: float = typer.Option(0.10, "--overlap"),
+    overlap: float = typer.Option(0.5, "--overlap", help="Tile stride = tile_size * (1 - overlap)."),
+    edge_fraction: float = typer.Option(0.1, "--edge-fraction", help="Per-side inner keep-box inset, in tile-size units."),
     mpp: Optional[float] = typer.Option(None, "--mpp"),
 ):
     """Generate tiles intersecting tissue."""
@@ -65,6 +66,7 @@ def tile(
         target_mpp=target_mpp,
         tile_size_model_px=tile_size,
         overlap_fraction=overlap,
+        edge_fraction=edge_fraction,
     )
     write_geoparquet(gdf, out)
     typer.echo(f"Wrote {len(gdf)} tiles to {out}")
@@ -111,10 +113,10 @@ def consensus(
     iou_threshold: float = typer.Option(0.3, "--iou-threshold"),
 ):
     """Build union + IoU-matched intersection consensus."""
-    from .consensus import build_intersection, build_union
+    from .consensus import build_intersection, build_union, dedupe_overlapping
 
-    s = read_geoparquet(stardist)
-    c = read_geoparquet(cellpose)
+    s = dedupe_overlapping(read_geoparquet(stardist))
+    c = dedupe_overlapping(read_geoparquet(cellpose))
     u = build_union(s, c)
     i = build_intersection(s, c, iou_threshold=iou_threshold)
     write_geoparquet(u, out_union)
@@ -128,7 +130,8 @@ def run(
     out_dir: Path = typer.Option(..., "--out-dir"),
     target_mpp: float = typer.Option(0.5, "--target-mpp"),
     tile_size: int = typer.Option(1024, "--tile-size"),
-    overlap: float = typer.Option(0.10, "--overlap"),
+    overlap: float = typer.Option(0.5, "--overlap", help="Tile stride = tile_size * (1 - overlap)."),
+    edge_fraction: float = typer.Option(0.1, "--edge-fraction", help="Per-side inner keep-box inset, in tile-size units."),
     batch_size: int = typer.Option(8, "--batch-size"),
     iou_threshold: float = typer.Option(0.3, "--iou-threshold"),
     gpu: bool = typer.Option(True, "--gpu/--cpu"),
@@ -145,7 +148,7 @@ def run(
     the second framework starts its thread pool. Subprocess isolation keeps
     each framework's runtime alone in its address space.
     """
-    from .consensus import build_intersection, build_union
+    from .consensus import build_intersection, build_union, dedupe_overlapping
     from .tiling import generate_tiles
     from .tissue import detect_tissue
 
@@ -167,6 +170,7 @@ def run(
         tiles = generate_tiles(
             slide, tissue_gdf, target_mpp=target_mpp,
             tile_size_model_px=tile_size, overlap_fraction=overlap,
+            edge_fraction=edge_fraction,
         )
         write_geoparquet(tiles, tiles_path)
         del tiles
@@ -186,8 +190,10 @@ def run(
         )
 
     with step(f"[5/{total_steps}] consensus"):
-        s_gdf = read_geoparquet(stardist_out)
-        c_gdf = read_geoparquet(cellpose_out)
+        s_gdf = dedupe_overlapping(read_geoparquet(stardist_out))
+        c_gdf = dedupe_overlapping(read_geoparquet(cellpose_out))
+        write_geoparquet(s_gdf, stardist_out)
+        write_geoparquet(c_gdf, cellpose_out)
         write_geoparquet(build_union(s_gdf, c_gdf), out_dir / "consensus_union.parquet")
         write_geoparquet(
             build_intersection(s_gdf, c_gdf, iou_threshold=iou_threshold),

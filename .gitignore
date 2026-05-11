@@ -1,0 +1,62 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+*.egg
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Data files
+data/
+*.svs
+*.tif
+*.tiff
+*.ndpi
+*.scn
+*.vms
+*.mrxs
+*.czi
+*.qptiff
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.zarr/
+*.pt
+*.pth
+*.ckpt
+*.onnx
+*.pkl
+*.pickle
+
+# Outputs
+outputs/
+results/
+checkpoints/
+models_cache/
+*.geojson
+*.json.gz

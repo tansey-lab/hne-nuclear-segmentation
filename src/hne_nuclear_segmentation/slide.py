@@ -73,7 +73,12 @@ class Slide:
 
     def thumbnail(self, target_mpp: float) -> tuple[np.ndarray, float]:
         scale = target_mpp / self.mpp
-        return self.backend.thumbnail(scale), scale
+        thumb = self.backend.thumbnail(scale)
+        # Derive actual scale from produced thumbnail dims — vips thumbnail
+        # honors a bounding box, so for portrait images the output may differ
+        # from the requested width-based size.
+        actual_scale = self.width / thumb.shape[1]
+        return thumb, actual_scale
 
 
 def _looks_like_zarr(path: Path) -> bool:
@@ -178,9 +183,10 @@ class _VipsBackend:
             attach_vips_progress(level_img, f"thumb L{level_idx}->w={thumb_w}")
             return _vips_to_numpy(level_img)
 
+        thumb_h = max(1, int(round(self.height / scale)))
         log.info("no pyramid available; streaming full image for thumbnail (slow path)")
-        thumb = pyvips.Image.thumbnail_image(self.image, thumb_w)
-        attach_vips_progress(thumb, f"thumbnail w={thumb_w}")
+        thumb = pyvips.Image.thumbnail_image(self.image, thumb_w, height=thumb_h)
+        attach_vips_progress(thumb, f"thumbnail w={thumb_w} h={thumb_h}")
         return _vips_to_numpy(thumb)
 
 

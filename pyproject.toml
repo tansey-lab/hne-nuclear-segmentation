@@ -15,7 +15,11 @@ dependencies = [
     "typer>=0.12",
     "tqdm>=4.66",
     "stardist>=0.9",
-    "tensorflow>=2.15,<2.16",
+    # On Linux (containers, CI, GPU hosts) pull the CUDA-bundled TF extra so
+    # Stardist inference can use the GPU. On macOS the `[and-cuda]` extra has
+    # no published wheels — fall back to plain `tensorflow` for local dev.
+    "tensorflow[and-cuda]>=2.15,<2.16; sys_platform == 'linux'",
+    "tensorflow>=2.15,<2.16; sys_platform != 'linux'",
     "csbdeep>=0.7",
     "cellpose>=4.0",
     "torch>=2.2",

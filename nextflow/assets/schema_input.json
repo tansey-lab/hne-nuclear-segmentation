@@ -1,0 +1,26 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/nf-core/hnenucseg/master/assets/schema_input.json",
+    "title": "nf-core/hnenucseg pipeline - params.input schema",
+    "description": "Schema for the file provided with params.input",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "sample": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Sample name must be provided and cannot contain spaces",
+                "meta": ["id"]
+            },
+            "slide_path": {
+                "type": "string",
+                "format": "file-path",
+                "exists": true,
+                "pattern": "^\\S+$",
+                "errorMessage": "slide_path must be provided and cannot contain spaces. Accepts any WSI format readable by pyvips/OpenSlide (e.g. .svs, .tif, .tiff, .ndpi, .mrxs)."
+            }
+        },
+        "required": ["sample", "slide_path"]
+    }
+}

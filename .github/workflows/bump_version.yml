@@ -1,0 +1,30 @@
+name: Bump Version
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "version.config"
+jobs:
+  bump:
+    name: Bump Nextflow Container Version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out source code
+        uses: actions/checkout@v4
+      - name: Get short SHA
+        id: short-sha
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+      - name: Find and Replace
+        uses: jacobtomlinson/gha-find-replace@v3
+        with:
+          find: '(hne_nuclear_segmentation_version\s*=\s*")[^"]*"'
+          replace: ${{ format('hne_nuclear_segmentation_version = "{0}"', steps.short-sha.outputs.sha) }}
+          regex: true
+          include: "version.config"
+      - name: Push changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: Auto-increment version number

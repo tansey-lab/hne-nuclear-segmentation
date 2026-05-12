@@ -1,0 +1,156 @@
+{
+  "form": {
+    "title": "nf-core/hnenucseg pipeline parameters",
+    "description": "Nuclear segmentation pipeline for H&E whole-slide images using Stardist and Cellpose with consensus outputs",
+    "type": "object",
+    "properties": {
+      "pipeline_options": {
+        "title": "Pipeline options",
+        "type": "object",
+        "fa_icon": "fas fa-dna",
+        "description": "Options for the H&E nuclear segmentation analysis.",
+        "properties": {
+          "target_mpp": {
+            "type": "number",
+            "default": 0.5,
+            "description": "Target microns per pixel for model inference.",
+            "fa_icon": "fas fa-ruler",
+            "minimum": 0.0
+          },
+          "tile_size": {
+            "type": "integer",
+            "default": 1024,
+            "description": "Tile size (pixels at target MPP).",
+            "fa_icon": "fas fa-th",
+            "minimum": 64
+          },
+          "overlap": {
+            "type": "number",
+            "default": 0.5,
+            "description": "Tile overlap fraction; stride = tile_size * (1 - overlap).",
+            "fa_icon": "fas fa-clone",
+            "minimum": 0.0,
+            "maximum": 0.95
+          },
+          "edge_fraction": {
+            "type": "number",
+            "default": 0.1,
+            "description": "Per-side inner keep-box inset (fraction of tile size).",
+            "fa_icon": "fas fa-border-style",
+            "minimum": 0.0,
+            "maximum": 0.5
+          },
+          "batch_size": {
+            "type": "integer",
+            "default": 8,
+            "description": "Inference batch size.",
+            "fa_icon": "fas fa-layer-group",
+            "minimum": 1
+          },
+          "iou_threshold": {
+            "type": "number",
+            "default": 0.3,
+            "description": "IoU threshold for matched-intersection consensus.",
+            "fa_icon": "fas fa-object-group",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "union_containment": {
+            "type": "number",
+            "default": 0.2,
+            "description": "Min intersection/larger-polygon area ratio for union merging.",
+            "fa_icon": "fas fa-object-ungroup",
+            "minimum": 0.0,
+            "maximum": 1.0
+          },
+          "gpu": {
+            "type": "boolean",
+            "default": true,
+            "description": "Use GPU for inference (falls back to CPU if unavailable).",
+            "fa_icon": "fas fa-microchip"
+          },
+          "mpp_override": {
+            "type": "number",
+            "description": "Override base-level microns-per-pixel if slide metadata lacks it.",
+            "fa_icon": "fas fa-pen"
+          },
+          "viz_html": {
+            "type": "boolean",
+            "default": true,
+            "description": "Build interactive HTML viewer.",
+            "fa_icon": "fas fa-eye"
+          },
+          "viz_pdf": {
+            "type": "boolean",
+            "default": true,
+            "description": "Build full-resolution tile detail PDF.",
+            "fa_icon": "fas fa-file-pdf"
+          },
+          "viz_pdf_tiles": {
+            "type": "integer",
+            "default": 2,
+            "description": "Number of detail tiles to render in the PDF.",
+            "fa_icon": "fas fa-images",
+            "minimum": 0
+          }
+        }
+      },
+      "input_output_options": {
+        "title": "Input/output options",
+        "type": "object",
+        "fa_icon": "fas fa-terminal",
+        "description": "Define where the pipeline should find input data and save output data.",
+        "properties": {
+          "email": {
+            "type": "string",
+            "description": "Email address for completion summary.",
+            "fa_icon": "fas fa-envelope",
+            "pattern": "^([a-zA-Z0-9_\\-\\.]+)@([a-zA-Z0-9_\\-\\.]+)\\.([a-zA-Z]{2,5})$"
+          },
+          "multiqc_title": {
+            "type": "string",
+            "description": "MultiQC report title.",
+            "fa_icon": "fas fa-file-signature"
+          }
+        }
+      },
+      "generic_options": {
+        "title": "Generic options",
+        "type": "object",
+        "fa_icon": "fas fa-file-import",
+        "description": "Less common options for the pipeline, typically set in a config file.",
+        "properties": {
+          "publish_dir_mode": {
+            "type": "string",
+            "default": "copy",
+            "description": "Method used to save pipeline results to output directory.",
+            "fa_icon": "fas fa-copy",
+            "enum": [
+              "symlink",
+              "rellink",
+              "link",
+              "copy",
+              "copyNoFollow",
+              "move"
+            ],
+            "hidden": true
+          },
+          "monochrome_logs": {
+            "type": "boolean",
+            "description": "Do not use coloured log outputs.",
+            "fa_icon": "fas fa-palette",
+            "hidden": true
+          },
+          "validate_params": {
+            "type": "boolean",
+            "description": "Boolean whether to validate parameters against the schema at runtime",
+            "default": true,
+            "fa_icon": "fas fa-check-square",
+            "hidden": true
+          }
+        }
+      }
+    }
+  },
+  "ui": {}
+}

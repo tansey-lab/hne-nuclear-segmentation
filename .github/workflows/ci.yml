@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags:
+      - "v*"
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libvips-dev libgl1 libglib2.0-0 libopenslide0
+
+      - name: Install dependencies
+        run: uv sync --extra dev
+
+      - name: Test
+        run: uv run pytest

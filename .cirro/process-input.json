@@ -1,0 +1,20 @@
+{
+  "outdir": "$.dataset.dataPath",
+  "target_mpp": "$.dataset.params.pipeline_options.target_mpp",
+  "tile_size": "$.dataset.params.pipeline_options.tile_size",
+  "overlap": "$.dataset.params.pipeline_options.overlap",
+  "edge_fraction": "$.dataset.params.pipeline_options.edge_fraction",
+  "batch_size": "$.dataset.params.pipeline_options.batch_size",
+  "iou_threshold": "$.dataset.params.pipeline_options.iou_threshold",
+  "union_containment": "$.dataset.params.pipeline_options.union_containment",
+  "gpu": "$.dataset.params.pipeline_options.gpu",
+  "mpp_override": "$.dataset.params.pipeline_options.mpp_override",
+  "viz_html": "$.dataset.params.pipeline_options.viz_html",
+  "viz_pdf": "$.dataset.params.pipeline_options.viz_pdf",
+  "viz_pdf_tiles": "$.dataset.params.pipeline_options.viz_pdf_tiles",
+  "email": "$.dataset.params.input_output_options.email",
+  "multiqc_title": "$.dataset.params.input_output_options.multiqc_title",
+  "publish_dir_mode": "$.dataset.params.generic_options.publish_dir_mode",
+  "monochrome_logs": "$.dataset.params.generic_options.monochrome_logs",
+  "validate_params": "$.dataset.params.generic_options.validate_params"
+}

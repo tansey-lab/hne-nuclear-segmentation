@@ -60,3 +60,4 @@ checkpoints/
 models_cache/
 *.geojson
 *.json.gz
+.nextflow

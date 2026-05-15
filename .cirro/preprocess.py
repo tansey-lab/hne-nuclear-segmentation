@@ -9,11 +9,17 @@ with columns `sample,slide_path`.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 from cirro.helpers.preprocess_dataset import PreprocessDataset
+
+
+def _sanitize_sample(name: str) -> str:
+    """nf-core sample names must match \\S+ — collapse whitespace to underscores."""
+    return re.sub(r"\s+", "_", str(name).strip())
 
 SAMPLESHEET_REQUIRED_COLUMNS = (
     "sample",
@@ -82,6 +88,7 @@ def samplesheet_from_files(ds: PreprocessDataset) -> pd.DataFrame:
         return pd.DataFrame(columns=list(SAMPLESHEET_REQUIRED_COLUMNS))
 
     files["slide_path"] = files["file"].apply(_resolve_slide_path)
+    files["sample"] = files["sample"].apply(_sanitize_sample)
     files = files[["sample", "slide_path"]]
 
     # If a sample has multiple slide files, keep one per sample. Users with
@@ -94,7 +101,21 @@ def samplesheet_from_files(ds: PreprocessDataset) -> pd.DataFrame:
         )
     files = files.drop_duplicates(subset=["sample"], keep="first")
 
-    samplesheet = pd.merge(ds.samplesheet, files, on="sample", how="left")
+    user_samplesheet = ds.samplesheet.copy()
+    user_samplesheet["sample"] = user_samplesheet["sample"].apply(_sanitize_sample)
+    samplesheet = pd.merge(user_samplesheet, files, on="sample", how="left")
+
+    # If merge produced no matches (user's sample names don't line up with
+    # file-derived names), fall back to the file-derived rows directly so we
+    # still produce a valid samplesheet instead of dropping everything.
+    if samplesheet["slide_path"].isna().all() and not files.empty:
+        ds.logger.warning(
+            "User samplesheet sample names did not match any WSI files "
+            f"({sorted(user_samplesheet['sample'].tolist())} vs "
+            f"{sorted(files['sample'].tolist())}). "
+            "Using file-derived sample names instead."
+        )
+        samplesheet = files
 
     return samplesheet
 
@@ -103,7 +124,7 @@ def samplesheet_from_params(ds: PreprocessDataset) -> pd.DataFrame:
     """Fall back to ds.metadata['inputs'] when no files are found."""
     return pd.DataFrame(
         {
-            "sample": [x["name"] for x in ds.metadata["inputs"]],
+            "sample": [_sanitize_sample(x["name"]) for x in ds.metadata["inputs"]],
             "slide_path": [x["dataPath"] for x in ds.metadata["inputs"]],
         }
     )
